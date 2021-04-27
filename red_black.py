@@ -72,6 +72,20 @@ class BSTNode:
             ret += self.right.__str__(level+1)
         return ret
 
+def is_red(node: Optional['RbNodeBase']):
+    if node:
+        return node.colour is Colour.RED
+    return False
+
+def insert_at_level(lvls, l, k):
+    if l > 0:
+        L = []
+        if len(lvls) >= l:
+            L = lvls[l-1]
+        else:
+            lvls.append(L)
+        L.append(k)
+
 @dataclass
 class RbNodeBase(BSTNode):
     colour: Colour = Colour.RED
@@ -79,37 +93,70 @@ class RbNodeBase(BSTNode):
     def __repr__(self):
         return f"{self.item} [{self.colour}]"
 
-    def graphviz(self, reds, arrows, levels, nils, level=0):
-        def insert_at_level(lvls, l, k):
-            if l > 0:
-                L = []
-                if len(lvls) >= l:
-                    L = lvls[l-1]
-                else:
-                    lvls.append(L)
-                L.append(k)
+    def as_234(self):
+        if is_red(self.left) and is_red(self.right):
+            return (
+                "4",
+                [self.left.item, self.item, self.right.item], 
+                [self.left.left, self.left.right, self.right.left, self.right.right]
+            )
+        elif is_red(self.left) and not is_red(self.right):
+            return (
+                "3L",
+                [self.left.item, self.item], 
+                [self.left.left, self.left.right, self.right]
+            )
+        elif not is_red(self.left) and is_red(self.right):
+            return (
+                "3R",
+                [self.item, self.right.item], 
+                [self.left, self.right.left, self.right.right]
+            )
+        else:
+            return (None, [self.item], [self.left, self.right])
 
+    def graphviz234(self, reds, arrows, levels, nils, level=0, parent_key=None):
+        node_type, items, children = self.as_234()
+        items_str = ",".join(map(str, items))
+        key_raw = f"{items_str}"
+        if node_type:
+            key_raw = f"{node_type}({items_str})"
+        key = f"\"{key_raw}\""
+        insert_at_level(levels, level, key)
+        if parent_key:
+            arrows.append(f"{parent_key} -> {key}")
+        if node_type != None:
+            reds.append(key)
+        for i in range(len(children)):
+            child = children[i]
+            if child:
+                child.graphviz234(reds, arrows, levels, nils, level + 1, key)
+            else:
+                # no need for nils when printing a 2-3-4 tree.
+                pass
+                # nil = f"\"n_{key_raw}_{i}\""
+                # nils.append(nil)
+                # arrows.append(f"{key} -> {nil};")
+                # insert_at_level(levels, level + 1, nil)
+
+    def graphviz(self, reds, arrows, levels, nils, level=0, parent_key=None):
         key = str(self.item)
         insert_at_level(levels, level, key)
-
+        if parent_key:
+            arrows.append(f"{parent_key} -> {key}")
         if self.colour is Colour.RED:
             reds.append(key)
-        if self.left:
-            arrows.append(f"{key} -> {self.left.item};")
-            self.left.graphviz(reds, arrows, levels, nils, level + 1)
-        else:
-            nil = f"nl{key}"
-            arrows.append(f"{key} -> {nil};")
-            nils.append(nil)
-            insert_at_level(levels, level + 1, nil)
-        if self.right:
-            arrows.append(f"{key} -> {self.right.item};")
-            self.right.graphviz(reds, arrows, levels, nils, level + 1)
-        else:
-            nil = f"nr{key}"
-            arrows.append(f"{key} -> {nil};")
-            nils.append(nil)
-            insert_at_level(levels, level + 1, nil)
+
+        children = [self.left, self.right]
+        for i in range(len(children)):
+            child = children[i]
+            if child:
+                child.graphviz(reds, arrows, levels, nils, level + 1, key)
+            else:
+                nil = f"n_{key}_{i}"
+                nils.append(nil)
+                arrows.append(f"{key} -> {nil};")
+                insert_at_level(levels, level + 1, nil)
 
 @dataclass
 class RbNode(RbNodeBase):
@@ -375,6 +422,48 @@ digraph G {{
             fmt += "    "
             fmt += ", ".join(reds)
             fmt += " [fillcolor=red];\n"
+
+        if len(nils) > 0:
+            fmt += "    "
+            fmt += ", ".join(nils)
+            fmt += ' [label="NIL", shape=record, width=.2,height=.12, fontsize=7];\n'
+        for e in emph:
+            if e and e in reds:
+                fmt += f"{e} [fillcolor=purple];\n"
+            elif e:
+                fmt += f"{e} [fillcolor=blue];\n"
+        fmt += "    "
+        fmt += "\n    ".join(arrows)
+
+        fmt += "\n}"
+        return fmt
+
+    def graphviz234(self, title="G", emph=[]):
+        fmt  = f"""
+digraph G {{
+    graph [ratio=.48, ordering=out];
+    node [style=filled, color=black, shape=circle, width=.6 
+          fontname=Helvetica, fontweight=bold, fontcolor=white, 
+          fontsize=14, fixedsize=false, margin="0.01,0.01" ];
+    labelloc="t";
+    label="{title}";
+        """
+        reds = []
+        arrows = []
+        levels = []
+        nils = []
+        if self.root:
+            self.root.graphviz234(reds, arrows, levels, nils)
+        for l in range(len(levels)):
+            level = levels[l]
+            fmt += "    {rank=same; "
+            fmt += ", ".join(level)
+            fmt += "}\n"
+
+        if len(reds) > 0:
+            fmt += "    "
+            fmt += ", ".join(reds)
+            fmt += " [fillcolor=red, shape=ellipse];\n"
 
         if len(nils) > 0:
             fmt += "    "

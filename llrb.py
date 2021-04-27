@@ -6,7 +6,7 @@ import math
 
 DEBUG_NUM = 30
 
-from red_black import Colour, eprint, RbNodeBase, RbTree
+from red_black import Colour, eprint, RbNodeBase, RbTree, is_red
 
 # LLRB is a 2-3 or 2-3-4 tree, but the 3-nodes can only lean to the left.
 #
@@ -135,11 +135,6 @@ class LLRBNode(RbNodeBase):
         x.colour = self.colour
         self.colour = Colour.RED
         return x
-
-def is_red(node: LLRBNode):
-    if node:
-        return node.colour is Colour.RED
-    return False
 
 # cmp is gone in python 3
 T = TypeVar('T')
@@ -439,5 +434,6 @@ if __name__ == "__main__":
     assert(tree.contains(15))
     tree.delete(15, debug=True)
     assert(not tree.contains(15))
+    print(tree.graphviz234("Done"))
     # assert(not tree.contains(-100000))
 
