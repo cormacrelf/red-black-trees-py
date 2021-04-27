@@ -81,13 +81,13 @@ class RbNodeBase(BSTNode):
 
     def graphviz(self, reds, arrows, levels, nils, level=0):
         def insert_at_level(lvls, l, k):
-            if level > 0:
+            if l > 0:
                 L = []
-                if len(levels) >= level:
-                    L = levels[level-1]
+                if len(lvls) >= l:
+                    L = lvls[l-1]
                 else:
-                    levels.append(L)
-                L.append(key)
+                    lvls.append(L)
+                L.append(k)
 
         key = str(self.item)
         insert_at_level(levels, level, key)
@@ -214,7 +214,7 @@ class RbTree:
                 is_right = True
         N = RbNode(data)
         if debug:
-            print(self.graphviz("PreInsert", str(data)))
+            print(self.graphviz("PreInsert", [str(data)]))
         # now we know the item isn't already in the tree
         self.size += 1
         self.rb_insert(parent, N, is_right, debug)
@@ -233,7 +233,7 @@ class RbTree:
         # now restore the red black balance by walking up from N to the top, rotating
         while True:
             if debug:
-                print(self.graphviz("Iter", str(N.item)))
+                print(self.graphviz("Iter", [str(N.item)]))
             if P.colour is Colour.BLACK:
                 # Case_I3: P black
                 return
@@ -349,7 +349,7 @@ class RbTree:
                 cursor = popped.right
         return True
 
-    def graphviz(self, title="G", emph=None):
+    def graphviz(self, title="G", emph=[]):
         fmt  = f"""
 digraph G {{
     graph [ratio=.48, ordering=out];
@@ -380,10 +380,11 @@ digraph G {{
             fmt += "    "
             fmt += ", ".join(nils)
             fmt += ' [label="NIL", shape=record, width=.2,height=.12, fontsize=7];\n'
-        if emph and emph in reds:
-            fmt += f"{emph} [fillcolor=purple];\n"
-        elif emph:
-            fmt += f"{emph} [fillcolor=blue];\n"
+        for e in emph:
+            if e and e in reds:
+                fmt += f"{e} [fillcolor=purple];\n"
+            elif e:
+                fmt += f"{e} [fillcolor=blue];\n"
         fmt += "    "
         fmt += "\n    ".join(arrows)
 

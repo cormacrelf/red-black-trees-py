@@ -1,12 +1,8 @@
-from enum import Enum
-from dataclasses import dataclass
 from typing import Any, Optional
-import sys
-import math
 
 DEBUG_NUM = 30
 
-from red_black import Colour, eprint, RbNodeBase, RbTree
+from red_black import Colour, RbNodeBase, RbTree, RbNode
 
 # Idea: eliminate the need for parent pointers, by having a list of traversed
 # parents that you construct as you insert a node. You can allocate that only once if you like.
@@ -19,7 +15,7 @@ class ParentlessRbNode(RbNodeBase):
 
 class ParentlessRbTree(RbTree):
     def __init__(self):
-        self.root = None
+        self.root: Optional[ParentlessRbNode] = None
         self.size = 0
 
     def _dir_rotate(self, G: Optional[ParentlessRbNode], P: ParentlessRbNode, right: bool):
@@ -50,7 +46,7 @@ class ParentlessRbTree(RbTree):
                 node = node.right
                 is_right = True
         if debug:
-            print(self.graphviz("PreInsert", str(data)))
+            print(self.graphviz("PreInsert", [str(data)]))
         # now we know the item isn't already in the tree
         self.size += 1
         self.rb_insert(stack, data, is_right, debug)
@@ -74,7 +70,7 @@ class ParentlessRbTree(RbTree):
         # now restore the red black balance by walking up from N to the top, rotating
         while True:
             if debug:
-                print(self.graphviz("Iter", str(N.item)))
+                print(self.graphviz("Iter", [str(N.item)]))
             if P.colour is Colour.BLACK:
                 # Case_I3: P black
                 return
@@ -124,6 +120,7 @@ if __name__ == "__main__":
 
     s = sorted(vals)
     assert(tree.to_list() == s)
+    # import math
     # assert(tree.max_depth() <= 2 * math.log2(len(vals) + 1))
     # assert(tree.contains(505))
     # assert(not tree.contains(-100000))

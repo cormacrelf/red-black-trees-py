@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, TypeVar
 import sys
 import math
 
@@ -142,7 +142,8 @@ def is_red(node: LLRBNode):
     return False
 
 # cmp is gone in python 3
-def cmp(a, b):
+T = TypeVar('T')
+def cmp(a: T, b: T) -> int:
     return int(a > b) - int(a < b)
 
 def insert(h: Optional[LLRBNode], key: Any, debug=False):
@@ -161,10 +162,13 @@ def insert(h: Optional[LLRBNode], key: Any, debug=False):
     # with flip_colours in this position, we have a 2-3 tree
     return h
 
+# based on the LLRB paper
+# https://www.cs.princeton.edu/~rs/talks/LLRB/LLRB.pdf
+# the slides have a different version of this somehow
 def fix_up_2_3(h):
     if is_red(h.right) and not is_red(h.left):
         h = h.rotate_left()
-    if is_red(h.left) and not is_red(h.right):
+    if is_red(h.left) and is_red(h.left.left):
         h = h.rotate_right()
     # with flip_colours in this position, we have a 2-3 tree
     if is_red(h.left) and is_red(h.right):
@@ -289,8 +293,8 @@ def move_red_left(h):
         => h.left is RED
     - h.right.left is red
         - after flip, you have a right-left zig-zag on the right, so rotate h.right right
-        - h is now /\ with an extra h.right.right double red
-        - so rotate h into a /\ with extra h.left.left double red
+        - h is now /\\ with an extra h.right.right double red
+        - so rotate h into a /\\ with extra h.left.left double red
         - colour flip h again, leaving h red, h.left & h.right both BLACK, and h.left.left RED.
         - Hence h.left is now a left-leaning 3-node
         => h.left is BLACK
@@ -307,7 +311,7 @@ def move_red_left(h):
         h.flip_colours()
     return h
 
-def delete_min(h):
+def delete_min(h, debug_hook = None):
     """
     Invariant: either h or h.left is RED (weaker: h is not a 2-node)
     Implication: deletion is easy at the bottom
@@ -316,13 +320,14 @@ def delete_min(h):
     need to borrow some red to make h.left not a 2-node. See move_red_left
 
     """
+    debug_hook(h, "delete_min")
     # remove node on bottom by returning None instead of h
     if h.left is None:
         return None
     # borrow h's red link push red link down if necessary
     if not is_red(h.left) and not is_red(h.left.left):
         h = move_red_left(h)
-    h.left = delete_min(h.left)
+    h.left = delete_min(h.left, debug_hook)
     return fix_up_2_3(h)
 
 def min(h):
@@ -330,26 +335,47 @@ def min(h):
         h = h.left
     return h
 
-def delete(h, key):
+def delete(h, key, debug_hook = None):
+    # you can't do cmp(key, h.item) only once. H changes.
     if key < h.item:
+        if not h.left:
+            # item not present
+            return h
         if not is_red(h.left) and not is_red(h.left.left):
+            if debug_hook:
+                debug_hook(h, "moving red left")
             h = move_red_left(h)
-        h.left = delete(h.left, key)
+        if debug_hook:
+            debug_hook(h, "k < h, now deleting in h.left")
+        h.left = delete(h.left, key, debug_hook)
     else:
         if is_red(h.left):
             h = h.rotate_right()
-        if key == h.item and not h.right:
+
+        if key == h.item and h.right is None:
             return None
+
         if not is_red(h.right) and not is_red(h.right.left):
+            if debug_hook:
+                debug_hook(h, "moving red right")
             h = move_red_right(h)
+
         if key == h.item:
+            if debug_hook:
+                debug_hook(h, "found k (1). h.item = min(h.right); h.right = delete_min(h.right)")
             m = min(h.right)
-            # h.value = m.value
             h.item = m.item
-            h.right = delete_min(h.right)
+            # h.value = m.value
+            h.right = delete_min(h.right, debug_hook)
         else:
-            h.right = delete(h.right, key)
-    return fix_up_2_3(h)
+            if debug_hook:
+                debug_hook(h, "k > h, now deleting in h.right")
+            h.right = delete(h.right, key, debug_hook)
+
+    if debug_hook:
+        debug_hook(h, "pre fixup as stepping back out")
+    h = fix_up_2_3(h)
+    return h
 
 class LLRB(RbTree):
     def __init__(self):
@@ -358,11 +384,11 @@ class LLRB(RbTree):
 
     def insert(self, key: Any, debug=False):
         if debug:
-            print(self.graphviz("PreInsert", str(key)))
+            print(self.graphviz("PreInsert", [str(key)]))
         self.root = insert(self.root, key, debug)
         self.root.colour = Colour.BLACK
         if debug:
-            print(self.graphviz("PostInsert", str(key)))
+            print(self.graphviz("PostInsert", [str(key)]))
 
     def delete_min(self):
         self.root = delete_min(self.root)
@@ -370,14 +396,24 @@ class LLRB(RbTree):
             self.root.colour = Colour.BLACK
 
     def delete(self, key: Any, debug=False):
-        if debug:
-            print(self.graphviz("PreDelete", str(key)))
         if self.root:
-            self.root = delete(self.root, key)
+            def debug_hook(h, why, only_h=True):
+                if only_h:
+                    tree = LLRB()
+                    tree.root = h
+                    print(tree.graphviz(f"Delete {key} (subtree): {why}", [str(h.item)]))
+                else:
+                    print(self.graphviz(f"Delete {key}: {why}", [str(h.item)]))
+            if debug:
+                print(self.graphviz("PreDelete", [str(key)]))
+            hook = None
+            if debug:
+                hook = debug_hook
+            self.root = delete(self.root, key, hook)
             if self.root:
                 self.root.colour = Colour.BLACK
         if debug:
-            print(self.graphviz("PostDelete", str(key)))
+            print(self.graphviz("PostDelete", [str(key)]))
 
 if __name__ == "__main__":
     import random
@@ -385,6 +421,13 @@ if __name__ == "__main__":
     tree = LLRB()
     vals = list(range(30))
     random.shuffle(vals)
+    # some other weird case
+    # vals = [12, 26, 24, 27, 23, 11, 3, 1, 15, 29, 14, 8, 2, 25, 13, 9, 28, 18, 6, 17, 0, 5, 22, 7, 19, 16, 10, 4, 21, 20]
+    # 15 is the root node
+    # vals = [29, 19, 15, 1, 3, 18, 20, 5, 22, 11, 23, 25, 13, 14, 17, 9, 27, 26, 4, 7, 16, 28, 8, 24, 2, 12, 21, 10, 0, 6]
+    # vals = [10, 24, 19, 25, 27, 1, 7, 23, 28, 17, 16, 2, 26, 21, 15, 6, 20, 9, 11, 4, 12, 14, 5, 18, 29, 22, 3, 13, 8, 0]
+    # vals = [17, 16, 6, 14, 20, 12, 26, 27, 8, 29, 7, 13, 24, 3, 9, 22, 15, 21, 2, 11, 1, 19, 28, 23, 5, 10, 4, 25, 18, 0]
+    eprint(vals)
     j = 0
     for i in vals:
         tree.insert(i, debug= (j == 15))
