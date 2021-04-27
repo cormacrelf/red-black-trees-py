@@ -31,20 +31,37 @@ DEBUG_NUM = 30
 # red-black property, so we need to restore it. To do this we need to look at
 # some operations on red-black trees. 
 
-
 class Colour(Enum):
     RED = 0
     BLACK = 1
     def __str__(self):
         return "red" if self == Colour.RED else "BLACK"
+    def flip(self):
+        if self is Colour.RED:
+            return Colour.BLACK
+        else:
+            return Colour.RED
 
 @dataclass
-class RbNode:
+class BSTNode:
     item: Any
-    colour: Colour
-    left: Optional['RbNode']
-    right: Optional['RbNode']
-    parent: Optional['RbNode']
+    left: Optional['RbNode'] = None
+    right: Optional['RbNode'] = None
+
+    def set_child(self, node: 'BSTNode', right: bool):
+        if right:
+            self.right = node
+        else:
+            self.left = node
+
+    def get_child(self, right: bool) -> Optional['BSTNode']:
+        if right:
+            return self.right
+        else:
+            return self.left
+
+    def __repr__(self):
+        return f"{self.item}"
 
     def __str__(self, level=0):
         ret = ""
@@ -54,6 +71,13 @@ class RbNode:
         if self.right:
             ret += self.right.__str__(level+1)
         return ret
+
+@dataclass
+class RbNodeBase(BSTNode):
+    colour: Colour = Colour.RED
+
+    def __repr__(self):
+        return f"{self.item} [{self.colour}]"
 
     def graphviz(self, reds, arrows, levels, nils, level=0):
         def insert_at_level(lvls, l, k):
@@ -87,6 +111,10 @@ class RbNode:
             nils.append(nil)
             insert_at_level(levels, level + 1, nil)
 
+@dataclass
+class RbNode(RbNodeBase):
+    parent: Optional['RbNode'] = None
+
     def __repr__(self):
         return f"{self.item} [{self.colour}]"
 
@@ -105,21 +133,11 @@ class RbNode:
         assert(P is not None)
         return self is P.right
 
-    def set_child(self, node: 'RbNode', right: bool):
-        if right:
-            self.right = node
-        else:
-            self.left = node
-    def get_child(self, right: bool) -> Optional['RbNode']:
-        if right:
-            return self.right
-        else:
-            return self.left
-
 class RbTree:
     def __init__(self):
         self.root = None
         self.size = 0
+
     def _dir_rotate(self, P: RbNode, is_right: bool):
         right = is_right
         left = not is_right
@@ -194,7 +212,7 @@ class RbTree:
             else:
                 node = node.right
                 is_right = True
-        N = RbNode(data, Colour.RED, None, None, None)
+        N = RbNode(data)
         if debug:
             print(self.graphviz("PreInsert", str(data)))
         # now we know the item isn't already in the tree
@@ -333,11 +351,13 @@ class RbTree:
 
     def graphviz(self, title="G", emph=None):
         fmt  = f"""
-digraph {title} {{
+digraph G {{
     graph [ratio=.48, ordering=out];
     node [style=filled, color=black, shape=circle, width=.6 
           fontname=Helvetica, fontweight=bold, fontcolor=white, 
           fontsize=14, fixedsize=false, margin="0.01,0.01" ];
+    labelloc="t";
+    label="{title}";
         """
         reds = []
         arrows = []
@@ -370,20 +390,20 @@ digraph {title} {{
         fmt += "\n}"
         return fmt
 
+if __name__ == "__main__":
+    import random
 
+    tree = RbTree()
+    vals = list(range(500))
+    # random.shuffle(vals)
+    j = 0
+    for i in vals:
+        tree.insert(i, debug= (j == 11))
+        j += 1
 
-import random
+    s = sorted(vals)
+    assert(tree.to_list() == s)
+    assert(tree.max_depth() < 2 * math.log2(len(vals) + 1))
+    # assert(tree.contains(505))
+    # assert(not tree.contains(-100000))
 
-tree = RbTree()
-vals = list(range(500))
-# random.shuffle(vals)
-j = 0
-for i in vals:
-    tree.insert(i, debug= (j == 11))
-    j += 1
-
-s = sorted(vals)
-assert(tree.to_list() == s)
-assert(tree.max_depth() < 2 * math.log2(len(vals) + 1))
-# assert(tree.contains(505))
-# assert(not tree.contains(-100000))
